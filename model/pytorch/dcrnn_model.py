@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from model.pytorch.dcrnn_cell import DCGRUCell
+from dcrnn_cell import DCGRUCell
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -88,8 +88,8 @@ class DecoderModel(nn.Module, Seq2SeqAttrs):
             hidden_states.append(next_hidden_state)
             output = next_hidden_state
 
-        projected = self.projection_layer(output.view(-1, self.rnn_units))
-        output = projected.view(-1, self.num_nodes * self.output_dim)
+        # projected = self.projection_layer(output.view(-1, self.rnn_units))
+        # output = projected.view(-1, self.num_nodes * self.output_dim)
 
         return output, torch.stack(hidden_states)
 
