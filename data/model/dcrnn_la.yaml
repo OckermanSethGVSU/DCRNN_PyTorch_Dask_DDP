@@ -21,12 +21,13 @@ model:
   rnn_units: 64
   seq_len: 12
   use_curriculum_learning: true
+  graph_pkl_filename: data/sensor_graph/adj_mx.pkl
 
 train:
   base_lr: 0.01
   dropout: 0
   epoch: 0
-  epochs: 100
+  epochs: 5
   epsilon: 1.0e-3
   global_step: 0
   lr_decay_ratio: 0.1
@@ -36,4 +37,9 @@ train:
   optimizer: adam
   patience: 50
   steps: [20, 30, 40, 50]
-  test_every_n_epochs: 10
+  test_every_n_epochs: 1000
+  mode: local
+  npar: 1
+  h5: data/metr-la.h5
+  load_path: auto
+  
