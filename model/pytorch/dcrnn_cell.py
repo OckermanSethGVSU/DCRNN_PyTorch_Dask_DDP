@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from lib import utils
+from utils import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -57,14 +57,14 @@ class DCGRUCell(torch.nn.Module):
         self._use_gc_for_ru = use_gc_for_ru
         supports = []
         if filter_type == "laplacian":
-            supports.append(utils.calculate_scaled_laplacian(adj_mx, lambda_max=None))
+            supports.append(calculate_scaled_laplacian(adj_mx, lambda_max=None))
         elif filter_type == "random_walk":
-            supports.append(utils.calculate_random_walk_matrix(adj_mx).T)
+            supports.append(calculate_random_walk_matrix(adj_mx).T)
         elif filter_type == "dual_random_walk":
-            supports.append(utils.calculate_random_walk_matrix(adj_mx).T)
-            supports.append(utils.calculate_random_walk_matrix(adj_mx.T).T)
+            supports.append(calculate_random_walk_matrix(adj_mx).T)
+            supports.append(calculate_random_walk_matrix(adj_mx.T).T)
         else:
-            supports.append(utils.calculate_scaled_laplacian(adj_mx))
+            supports.append(calculate_scaled_laplacian(adj_mx))
         for support in supports:
             self._supports.append(self._build_sparse_matrix(support))
 

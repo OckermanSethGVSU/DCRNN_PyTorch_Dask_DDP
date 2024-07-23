@@ -5,9 +5,9 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from lib import utils
-from model.pytorch.dcrnn_model import DCRNNModel
-from model.pytorch.loss import masked_mae_loss
+import utils
+from dcrnn_model import DCRNNModel
+from loss import masked_mae_loss
 
 from dask.distributed import LocalCluster
 from dask.distributed import Client
@@ -200,9 +200,14 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
             device = f"cuda:{worker_rank % 4}"
             print(device)
             # print(train_dict)
-            device=None
-            # torch.cuda.set_device(worker_rank % 4)
+            # device=None
+            torch.cuda.set_device(worker_rank % 4)
 
+            if not os.path.exists("logs/"):
+                os.makedirs("logs/")
+            if not os.path.exists("logs/info.log"):
+                with open("logs/info.log", 'w') as file:
+                    file.write('')
             log_dir = "logs/"
             writer = SummaryWriter('runs/' + log_dir)
 
@@ -213,12 +218,7 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
             lazy_batching = False
            
 
-            if not os.path.exists("logs/"):
-                os.makedirs("logs/")
-            if not os.path.exists("logs/info.log"):
-                with open("logs/info.log", 'w') as file:
-                    file.write('')
-            from lib.utils import load_graph_data
+            from utils import load_graph_data
             sensor_ids, sensor_id_to_ind, adj_mx = load_graph_data(model_dict['graph_pkl_filename'])
             
             if not lazy_batching:
@@ -264,7 +264,7 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
                 print("Loading saved state", flush=True)
                 checkpoint = torch.load(train_dict['load_path'])
                 model = DCRNNModel(adj_mx, logger, **model_dict)
-                model = DDP(model, gradient_as_bucket_view=True)
+                model = DDP(model, gradient_as_bucket_view=True).to(device)
 
                 with torch.no_grad():
                     model = model.eval()
@@ -294,7 +294,7 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
 
                         output = model(x)
                         
-                        break
+                        
                 model.module.load_state_dict(checkpoint['model_state_dict'])
 
                 start_epoch = checkpoint['epoch']
@@ -310,7 +310,8 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
                 # start_epoch, batches_seen, engine.optimizer = model.module.load_checkpoint(args.load_path, engine.optimizer)
             else:
                 model = DCRNNModel(adj_mx, logger, **model_dict)
-                model = DDP(model, gradient_as_bucket_view=True)
+                model = DDP(model, gradient_as_bucket_view=True).to(device)
+
                 # print(adj_mx)
                 optimizer = torch.optim.Adam(model.module.parameters(), lr=train_dict['base_lr'], eps=train_dict['epsilon'])
 
@@ -408,7 +409,7 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
                     
                     optimizer.step()
 
-                    break
+                    if i == 3: break
                 logger.info("epoch complete")
                 lr_scheduler.step()
                 logger.info("evaluating now!")
@@ -448,7 +449,7 @@ def my_train(x_train=None, y_train=None, ycl_train=None, x_val=None, y_val=None,
 
                         y_truths.append(y.cpu())
                         y_preds.append(output.cpu())
-                        break
+                        if i == 3: break
 
                     val_loss = np.mean(val_losses)
                     overall_v_loss.append(val_loss)
@@ -550,15 +551,15 @@ class DCRNNSupervisor:
         self.max_grad_norm = self._train_kwargs.get('max_grad_norm', 1.)
 
         # logging.
-        self._log_dir = self._get_log_dir(kwargs)
-        self._writer = SummaryWriter('runs/' + self._log_dir)
+        # self._log_dir = self._get_log_dir(kwargs)
+        # self._writer = SummaryWriter('runs/' + self._log_dir)
 
-        log_level = self._kwargs.get('log_level', 'INFO')
-        self._logger = utils.get_logger(self._log_dir, __name__, 'info.log', level=log_level)
+        # log_level = self._kwargs.get('log_level', 'INFO')
+        # self._logger = utils.get_logger(self._log_dir, __name__, 'info.log', level=log_level)
 
         # data set
-        self._data = utils.load_dataset(**self._data_kwargs)
-        self.standard_scaler = self._data['scaler']
+        # self._data = utils.load_dataset(**self._data_kwargs)
+        # self.standard_scaler = self._data['scaler']
 
         self.num_nodes = int(self._model_kwargs.get('num_nodes', 1))
         self.input_dim = int(self._model_kwargs.get('input_dim', 1))
@@ -575,8 +576,8 @@ class DCRNNSupervisor:
 
         self._epoch_num = self._train_kwargs.get('epoch', 0)
         
-        if self._epoch_num > 0:
-            self.load_model()
+        # if self._epoch_num > 0:
+        #     self.load_model()
         
     
     @staticmethod
@@ -896,7 +897,7 @@ class DCRNNSupervisor:
 
         # args = (x_train, y_train, ycl_train, x_val, y_val)
         if kwargs['mode'] == "dist":
-            for f in ['my_util.py', 'layer.py', 'net.py', 'trainer.py']:
+            for f in ['utils.py', 'dcrnn_cell.py', 'dcrnn_model.py', 'loss.py', 'dask_supervisor.py']:
                 client.upload_file(f)
         
         
@@ -912,7 +913,7 @@ class DCRNNSupervisor:
         rh.process_results(".", futures, raise_errors=False)
         client.shutdown()
         
-        exit()
+        
         
         
 
